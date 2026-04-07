@@ -40,7 +40,7 @@ class FeedEntry(NamedTuple):
     feed_url: str = ""
 
 
-API_BASE = "https://kagi.com/api/v1/smallweb/feed"
+API_BASE = os.environ.get("FEED_API_BASE", "http://localhost:5555")
 
 # Category definitions — slug → label · description · emoji
 CATEGORIES = OrderedDict(
@@ -1001,10 +1001,11 @@ def index():
                 chosen = cache[0]
             else:
                 chosen = _pick_unseen(cache, seen)
-            url, title, author, post_cats = (
+            url, title, author, description, post_cats = (
                 chosen.link,
                 chosen.title,
                 chosen.author,
+                chosen.description,
                 chosen.categories,
             )
         else:
@@ -1068,6 +1069,13 @@ def index():
 
     domain = get_registered_domain(url)
     domain = re.sub(r"^(www\.)?", "", domain)
+
+    # Sites that block iframing — proxy through our server instead
+    NO_IFRAME_DOMAINS = [
+        "nature.com", "quantamagazine.org", "scientificamerican.com",
+        "bostonreview.net", "media.mit.edu", "4columns.org",
+    ]
+    no_iframe = any(d in url for d in NO_IFRAME_DOMAINS)
 
     videoid = ""
 
@@ -1197,6 +1205,8 @@ def index():
             category_counts=category_counts,
             post_categories=post_categories,
             feed_url=feed_url,
+            description=description or "",
+            no_iframe=no_iframe,
             gh_meta=gh_meta,
             has_embedding=(bool(embeddings_cache) and url in embeddings_cache),
         )
@@ -1306,6 +1316,28 @@ def river():
         feed_url=feed_url,
         total=total,
     )
+
+
+@app.route("/proxy")
+@app.route(f"{prefix}/proxy")
+def proxy():
+    """Proxy external pages that block iframing. Serves from our origin."""
+    target = request.args.get("url", "")
+    if not target:
+        return "Missing url parameter", 400
+    try:
+        resp = requests.get(target, timeout=15, headers={
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+        }, allow_redirects=True)
+        resp.raise_for_status()
+    except requests.RequestException as e:
+        return f"Failed to fetch: {e}", 502
+
+    content = resp.text
+    base_url = resp.url
+    content = content.replace("<head>", f'<head><base href="{base_url}">', 1)
+    content = content.replace("<HEAD>", f'<HEAD><base href="{base_url}">', 1)
+    return Response(content, content_type=resp.headers.get("Content-Type", "text/html"))
 
 
 @app.route("/similar")

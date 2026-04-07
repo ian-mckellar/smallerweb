@@ -27,14 +27,14 @@
   <link rel="preload" href="{{ url_for('static', filename='vt323-regular-webfont.woff2') }}" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   {% if next_link %}
+  <link rel="prefetch" href="{{ next_link }}">
+  {% if next_doc_url and 'nature.com' not in next_doc_url and 'quantamagazine.org' not in next_doc_url and 'scientificamerican.com' not in next_doc_url and 'bostonreview.net' not in next_doc_url and 'media.mit.edu' not in next_doc_url and '4columns.org' not in next_doc_url %}
   <script type="speculationrules">
   {
     "prerender": [{ "urls": ["{{ next_link }}"], "eagerness": "eager" }],
     "prefetch":  [{ "urls": ["{{ next_doc_url }}"], "eagerness": "eager", "referrer_policy": "no-referrer" }]
   }
   </script>
-  <link rel="prefetch" href="{{ next_link }}">
-  {% if next_doc_url %}
   <link rel="preconnect" href="{{ next_host }}" crossorigin>
   <link rel="dns-prefetch" href="{{ next_host }}">
   <link rel="prefetch" href="{{ next_doc_url }}" as="document" crossorigin>
@@ -400,9 +400,17 @@ href="https://github.com/kagisearch/smallweb" target="_blank" rel="noopener nore
         {% endif %}
       </div>
     </div>
+  {% elif no_iframe %}
+    <div id="content">
+      <iframe
+        id="content-iframe"
+        src="{{ prefix }}proxy?url={{ url | urlencode }}"
+      ></iframe>
+    </div>
   {% else %}
     <div id="content">
       <iframe
+        id="content-iframe"
         src="{{url}}"
         {% if flag_content_count and flag_content_count >= 5 %}
           srcdoc='<p>The content of this page has been flagged by users. Click below to open the page in new tab.</p><a href="{{url}}" target="_blank" rel="noopener noreferrer">View Flagged Content</a>'
